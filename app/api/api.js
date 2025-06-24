@@ -1405,7 +1405,20 @@ export const inventoryAPI = {
       console.error('Error deleting inventory item:', error);
       throw error;
     }
-  }
+  },
+  
+  getClinic: async (clinicId) => {
+    try {
+      const response = await api.get(`/inventory/clinic/${clinicId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  
+  getLowStock: async (clinicId) => {
+    try { const r=await api.get(`/inventory/clinic/${clinicId}/low-stock`); return r.data; } catch(e){ throw e; }
+  },
 };
 
 // ============================================================
@@ -1562,6 +1575,26 @@ export const videoTokenAPI = {
       throw err;
     }
   },
+};
+
+// ============================================================
+//                 Clinical Notes API
+// ============================================================
+export const clinicalNotesAPI = {
+  create: async (noteData) => {
+    try { const res = await api.post('/clinical-notes', noteData); return res.data; }
+    catch(e){ throw e.response?.data || e.message; }
+  },
+  getByConsultation: async (consultationId) => {
+    try { const res = await api.get(`/clinical-notes/consultation/${consultationId}`); return res.data; }
+    catch(e){ throw e.response?.data || e.message; }
+  },
+  getByPet: async (petId) => {
+    try { const res = await api.get(`/clinical-notes/pet/${petId}`); return res.data; } catch(e){ throw e.response?.data||e.message; }
+  },
+  get: async(id)=>{
+    try{const res=await api.get(`/clinical-notes/${id}`);return res.data;}catch(e){throw e.response?.data||e.message;}
+  }
 };
 
 // Initialize auth on import

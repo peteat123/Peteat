@@ -122,6 +122,10 @@ io.on('connection', (socket) => {
   });
 });
 
+// after io.on connection declaration maybe earlier
+io.on('connection', (socket) => { /* existing code */ });
+app.set('io', io);
+
 // Middleware
 app.use(helmet());
 
@@ -189,6 +193,7 @@ const adminRoutes = require('./routes/admin');
 const videoTokenRoutes = require('./routes/videoToken');
 const authTokensRoutes = require('./routes/authTokens');
 const notificationsRoutes = require('./routes/notifications');
+const clinicalNotesRoutes = require('./routes/clinicalNotes');
 
 app.use('/api/users', userRoutes);
 app.use('/api/pets', petRoutes);
@@ -203,6 +208,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/video-token', videoTokenRoutes);
 app.use('/api/auth', authTokensRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/clinical-notes', clinicalNotesRoutes);
 
 // Global error handler (MUST be after all routes)
 app.use(errorHandler);
@@ -334,6 +340,7 @@ const startServer = async () => {
     
     // Start background cron jobs (reminders, etc.)
     require('./jobs/reminderJob');
+    require('./jobs/lowStockJob');
     
     // Start server after database connection is established
     server.listen(PORT, '0.0.0.0', () => {

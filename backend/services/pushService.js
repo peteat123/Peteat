@@ -44,4 +44,18 @@ exports.sendToUsers = async (userIds, payload) => {
   } catch (err) {
     console.error('Error sending push notifications', err);
   }
+};
+
+exports.broadcastExcept = async (excludeUserId, payload) => {
+  try {
+    const tokensDocs = await PushToken.find({ user: { $ne: excludeUserId } });
+    const messages = [];
+    for (const doc of tokensDocs) {
+      if (!Expo.isExpoPushToken(doc.token)) continue;
+      messages.push({ to: doc.token, sound: 'default', title: payload.title, body: payload.body, data: payload.data||{} });
+      Notification.create({ user: doc.user, title: payload.title, body: payload.body, data: payload.data }).catch(()=>{});
+    }
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) { await expo.sendPushNotificationsAsync(chunk); }
+  } catch(err){ console.error('broadcastExcept error', err); }
 }; 

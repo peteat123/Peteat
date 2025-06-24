@@ -23,7 +23,12 @@ import { LoadingDialog } from '@/components/ui/LoadingDialog';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useUserRole } from '../contexts/UserRoleContext';
 import { useAuth } from '../contexts/AuthContext';
+// @ts-ignore dynamic js module
 import { videoConsultationAPI } from '../api/api';
+import VideoCall from '../../components/VideoCall';
+import ClinicalNoteDialog from '../../components/ui/ClinicalNoteDialog';
+// @ts-ignore dynamic js module
+import { clinicalNotesAPI } from '../api/api';
 // @ts-ignore - expo-av types may not be available in all build environments
 // import { Audio } from 'expo-av';
 
@@ -60,6 +65,7 @@ export default function VideoConsultationScreen() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [callDuration, setCallDuration] = useState(0);
   const [callTimer, setCallTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [noteDialogVisible, setNoteDialogVisible] = useState(false);
   
   // Request audio permissions and fetch consultation data
   useEffect(() => {
@@ -255,30 +261,37 @@ export default function VideoConsultationScreen() {
   const requestPrescription = () => performAction('Request E-Prescription', 'E-prescription request has been sent.');
   const openMedicalRecord = () => performAction('Medical Record', 'Medical record viewer will be available soon.');
   const sendPrescription = () => performAction('Send E-Prescription', 'E-prescription form will be available soon.');
-  const addDiagnosis = () => performAction('Add Diagnosis', 'Diagnosis form will be available soon.');
+  const addDiagnosis = () => {
+    setNoteDialogVisible(true);
+  };
   const addNotes = () => performAction('Add Notes', 'Notes editor will be available soon.');
   
   const completeConsultation = () => {
-    setIsLoading(true);
-    cleanupVideoSession();
-    
-    setTimeout(async () => {
-      try {
-        if (consultationId) {
-          await videoConsultationAPI.updateStatus(consultationId, 'completed');
-        }
-        
-        Alert.alert(
-          'Consultation Completed',
-          'The consultation has been marked as completed and a summary has been sent to the pet owner.',
-          [{ text: 'OK', onPress: () => router.back() }]
-        );
-      } catch (error) {
-        console.error('Error completing consultation:', error);
-        Alert.alert('Error', 'Failed to complete the consultation. Please try again.');
-        setIsLoading(false);
-      }
-    }, 1500);
+    setNoteDialogVisible(true); // capture final note
+  };
+  
+  // Handle save from dialog
+  const handleSaveNote = async (data: any) => {
+    try {
+      setIsLoading(true);
+      if (!consultationId || !consultation?.pet?._id) throw new Error('Missing consultation or pet');
+      await clinicalNotesAPI.create({
+        consultation: consultationId,
+        pet: consultation.pet._id,
+        ...data,
+      });
+
+      // mark consultation completed when saving from complete action
+      await videoConsultationAPI.updateStatus(consultationId, 'completed');
+      Alert.alert('Saved', 'Clinical note saved successfully.');
+      router.back();
+    } catch (err: any) {
+      console.warn('Save note error', err);
+      Alert.alert('Error', err.message || 'Failed to save note');
+    } finally {
+      setIsLoading(false);
+      setNoteDialogVisible(false);
+    }
   };
   
   // Permissions handling
@@ -391,94 +404,23 @@ export default function VideoConsultationScreen() {
       
       {/* Main Content */}
       <View style={styles.videoContainer}>
-        {/* Remote Video */}
-        <View style={[styles.remoteVideo, { backgroundColor: '#2c3e50' }]}>
-          {sessionActive ? (
-            isVideoEnabled ? (
-              // Placeholder for remote user's video
-              <ImageBackground
-                source={require('../../assets/images/robert-pisot.jpg')}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
+        {/* Main Video area */}
+        {sessionActive ? (
+          <VideoCall roomName={consultationId as string} identity={user?.id ?? ''} onEnd={completeConsultation} />
+        ) : (
+          <View style={styles.startConsultationContainer}>
+            <IconSymbol name="video.fill" size={48} color="white" />
+            <Text style={[Typography.nunitoBodyMedium, { color: 'white', marginTop: 12, textAlign: 'center' }]}>
+              {consultation ? 'Ready to start video consultation' : 'Loading consultation details...'}
+            </Text>
+            {consultation && !sessionActive && (
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={startConsultation}
+                disabled={isLoading}
               >
-                {/* Connection status indicator */}
-                {renderConnectionStatus()}
-                
-                {/* Remote user's name */}
-                <View style={styles.remoteName}>
-                  <Text style={[Typography.nunitoBodyMedium, { color: 'white' }]}>
-                    {consultation?.clinic?.fullName || consultation?.petOwner?.fullName || 'Remote User'}
-                  </Text>
-                </View>
-                
-                {/* Muted indicator if remote user is muted */}
-                <View style={styles.remoteAudioIndicator}>
-                  <IconSymbol name="mic.slash" size={18} color="white" />
-                </View>
-              </ImageBackground>
-            ) : (
-              <View style={styles.videoDisabledContainer}>
-                <IconSymbol name="video.slash.fill" size={48} color="white" />
-                <Text style={[Typography.nunitoBodyMedium, { color: 'white', marginTop: 12 }]}>
-                  Your video is disabled
-                </Text>
-                
-                {/* Connection status indicator */}
-                {renderConnectionStatus()}
-                
-                {/* Remote user's name */}
-                <View style={styles.remoteName}>
-                  <Text style={[Typography.nunitoBodyMedium, { color: 'white' }]}>
-                    {consultation?.clinic?.fullName || consultation?.petOwner?.fullName || 'Remote User'}
-                  </Text>
-                </View>
-                
-                {/* Muted indicator if remote user is muted */}
-                <View style={styles.remoteAudioIndicator}>
-                  <IconSymbol name="mic.slash" size={18} color="white" />
-                </View>
-              </View>
-            )
-          ) : (
-            <View style={styles.startConsultationContainer}>
-              <IconSymbol name="video.fill" size={48} color="white" />
-              <Text style={[Typography.nunitoBodyMedium, { color: 'white', marginTop: 12, textAlign: 'center' }]}>
-                {consultation ? 'Ready to start video consultation' : 'Loading consultation details...'}
-              </Text>
-              
-              {consultation && !sessionActive && (
-                <TouchableOpacity
-                  style={styles.startButton}
-                  onPress={startConsultation}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.startButtonText}>Start Consultation</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-        
-        {/* Local Video (Self view) */}
-        {sessionActive && (
-          <View style={styles.localVideo}>
-            {isVideoEnabled ? (
-              <CameraView
-                ref={cameraRef as any}
-                style={{ width: '100%', height: '100%' }}
-                {...({ facing: isFrontCamera ? 'front' : 'back' } as any)}
-              />
-            ) : (
-              <View style={[styles.videoDisabledContainer, { backgroundColor: '#34495e' }]}>
-                <IconSymbol name="video.slash.fill" size={24} color="white" />
-              </View>
-            )}
-            
-            {/* Local muted indicator */}
-            {isMuted && (
-              <View style={styles.localAudioIndicator}>
-                <IconSymbol name="mic.slash.fill" size={14} color="white" />
-              </View>
+                <Text style={styles.startButtonText}>Start Consultation</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -589,6 +531,13 @@ export default function VideoConsultationScreen() {
       
       {/* Loading indicator */}
       <LoadingDialog visible={isLoading} message={connectionStatus === ConnectionStatus.CONNECTING ? "Connecting..." : "Loading..."} />
+      
+      {/* Clinical note input */}
+      <ClinicalNoteDialog
+        visible={noteDialogVisible}
+        onClose={() => setNoteDialogVisible(false)}
+        onSave={handleSaveNote}
+      />
     </View>
   );
 }

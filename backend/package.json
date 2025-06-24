@@ -30,5 +30,12 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false
+      }
+    }
   }
 }

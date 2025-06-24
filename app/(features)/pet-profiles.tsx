@@ -16,6 +16,8 @@ import { IconSymbol } from '../../components/ui/IconSymbol';
 import { Colors } from '../../constants/Colors';
 import { petAPI } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
+// @ts-ignore
+import { clinicalNotesAPI } from '../api/api';
 
 // Mock pet data type
 type Pet = {
@@ -42,6 +44,7 @@ export default function PetProfilesScreen() {
   const [pets, setPets] = useState<Pet[]>([]);
   
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
+  const [historyNotes, setHistoryNotes] = useState<any[]>([]);
   const [viewingHistory, setViewingHistory] = useState(false);
   
   const goBack = () => {
@@ -134,8 +137,14 @@ export default function PetProfilesScreen() {
     );
   };
   
-  const handleViewHistory = (pet: Pet) => {
+  const handleViewHistory = async (pet: Pet) => {
     setSelectedPet(pet);
+    try {
+      const notes = await clinicalNotesAPI.getByPet(pet.id);
+      setHistoryNotes(notes);
+    } catch (err) {
+      Alert.alert('Error', 'Unable to load medical history');
+    }
     setViewingHistory(true);
   };
   
@@ -182,12 +191,18 @@ export default function PetProfilesScreen() {
     </View>
   );
   
-  const renderHistoryItem = ({ item }: { item: { date: string, treatment: string, clinic: string, notes?: string } }) => (
+  const renderHistoryItem = ({ item }: { item: any }) => (
     <View style={styles.historyItem}>
-      <Text style={styles.historyDate}>{new Date(item.date).toLocaleDateString()}</Text>
-      <Text style={styles.historyTreatment}>{item.treatment}</Text>
-      <Text style={styles.historyClinic}>{item.clinic}</Text>
-      {item.notes && <Text style={styles.historyNotes}>{item.notes}</Text>}
+      <Text style={styles.historyDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+      {item.vitals && (
+        <Text style={styles.historyTreatment}>
+          Vitals — Wt: {item.vitals.weight || '-'}kg, Temp: {item.vitals.temperature || '-'}°C, CRT: {item.vitals.crt || '-'}s
+        </Text>
+      )}
+      {item.diagnosis && <Text style={styles.historyTreatment}>Diagnosis: {item.diagnosis}</Text>}
+      {item.treatmentPlan && <Text style={styles.historyTreatment}>Plan: {item.treatmentPlan}</Text>}
+      {item.prescription && <Text style={styles.historyTreatment}>Rx: {item.prescription}</Text>}
+      {item.additionalNotes && <Text style={styles.historyNotes}>{item.additionalNotes}</Text>}
     </View>
   );
   
@@ -238,11 +253,11 @@ export default function PetProfilesScreen() {
           </>
         ) : (
           <>
-            {selectedPet?.treatmentHistory && selectedPet.treatmentHistory.length > 0 ? (
+            {historyNotes.length > 0 ? (
               <FlatList
-                data={selectedPet.treatmentHistory}
+                data={historyNotes}
                 renderItem={renderHistoryItem}
-                keyExtractor={(item, index) => `${item.date}-${index}`}
+                keyExtractor={(item, index) => `${item._id || index}`}
                 contentContainerStyle={styles.listContainer}
               />
             ) : (
@@ -414,11 +429,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.light.text,
-    marginBottom: 4,
-  },
-  historyClinic: {
-    fontSize: 14,
-    color: Colors.light.tint,
     marginBottom: 4,
   },
   historyNotes: {

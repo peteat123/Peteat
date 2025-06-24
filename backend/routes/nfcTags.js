@@ -197,6 +197,13 @@ router.post('/:id/report-lost', isAuthenticated, asyncHandler(async (req, res) =
   };
   
   const updatedTag = await tag.save();
+  
+  // Push & socket
+  const io = req.app.get('io');
+  const pushPayload = { title: 'Lost Pet Alert', body: `${pet.name} has been reported lost`, data: { tagId: tag._id, type:'lost-pet' } };
+  require('../services/pushService').broadcastExcept(pet.owner.toString(), pushPayload);
+  if(io) io.emit('lostPetUpdate', { action:'lost', tag: updatedTag });
+  
   res.json(updatedTag);
 }));
 
@@ -222,6 +229,13 @@ router.post('/:id/mark-found', isAuthenticated, asyncHandler(async (req, res) =>
   tag.lostPetDetails = undefined;
   
   const updatedTag = await tag.save();
+  
+  // Push & socket
+  const io = req.app.get('io');
+  const pushPayload = { title: 'Lost Pet Alert', body: `${pet.name} has been marked found`, data: { tagId: tag._id, type:'found-pet' } };
+  require('../services/pushService').broadcastExcept(pet.owner.toString(), pushPayload);
+  if(io) io.emit('lostPetUpdate', { action:'found', tag: updatedTag });
+  
   res.json(updatedTag);
 }));
 

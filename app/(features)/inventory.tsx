@@ -14,9 +14,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '../../components/ui/IconSymbol';
 import { Colors } from '../../constants/Colors';
+// @ts-ignore
 import { inventoryAPI } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 // Define a type for inventory items
 type InventoryItem = {
@@ -41,6 +43,9 @@ export default function InventoryScreen() {
   const [error, setError] = useState('');
   const [currentView, setCurrentView] = useState<'all' | 'low-stock' | 'categories'>('all');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [lowStockCount, setLowStockCount] = useState<number>(0);
+  
+  useRoleGuard(['clinic']);
   
   const goBack = () => {
     router.back();
@@ -55,6 +60,7 @@ export default function InventoryScreen() {
     }
     
     fetchInventory();
+    fetchLowStock();
   }, [user]);
   
   // Fetch inventory based on current view
@@ -92,6 +98,16 @@ export default function InventoryScreen() {
       setLowStockItems(mockItems.filter(item => item.quantity <= item.lowStockThreshold));
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchLowStock = async () => {
+    if (!user?.id) return;
+    try {
+      const low = await inventoryAPI.getLowStock(user.id);
+      setLowStockCount(low.length);
+    } catch (err) {
+      console.log('low stock fetch err', err);
     }
   };
   
@@ -174,7 +190,7 @@ export default function InventoryScreen() {
           />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Inventory</Text>
+        <Text style={styles.headerTitle}>Inventory {lowStockCount > 0 && <Text style={{color:Colors.error}}>•</Text>}</Text>
         
         <TouchableOpacity style={styles.addButton} onPress={addItem}>
           <IconSymbol name="plus" size={20} color={Colors.light.tint} />

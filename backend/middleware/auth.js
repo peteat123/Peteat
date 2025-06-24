@@ -6,15 +6,22 @@ exports.isAuthenticated = async (req, res, next) => {
   try {
     console.log('Auth middleware checking authentication');
     
-    // Get token from header
-    const token = req.header('x-auth-token');
+    // Get token from header (support both custom and standard bearer headers)
+    let token = req.header('x-auth-token');
+    
+    // Fallback to standard Authorization: Bearer <token>
+    if (!token) {
+      const authHeader = req.header('authorization') || req.header('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7).trim();
+      }
+    }
     
     // Debug token presence
     if (token) {
       console.log('Token found in request');
     } else {
       console.log('No token found in request headers');
-      console.log('Headers:', req.headers);
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
     
